@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TweetWiper",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Deletes every post, reply and repost on your own X account, using the X tab you are already signed into.",
   "permissions": ["storage", "unlimitedStorage", "activeTab"],
   "host_permissions": ["https://x.com/*", "https://twitter.com/*"],

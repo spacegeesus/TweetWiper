@@ -15,7 +15,7 @@ Deletes every post, reply and repost on your own X account. It is a small Chrome
    - **Scan this profile page**: open `x.com/YOURNAME/with_replies` (your profile, "Replies" tab), then click Scan. It scrolls the page by itself and collects what it sees. Leave the tab alone while it scrolls.
 6. 🔴 **Dry run.** Leave "Dry run" ticked and press **Start**. The log tells you how many it would delete. Nothing is deleted yet.
 7. 🔴 **Do it for real.** Untick "Dry run", type `DELETE` in the box, press **Start**. Keep the tab open. It deletes about one post a second, so 4,000 posts take a little over an hour. If X tells it to slow down, it waits and continues on its own.
-8. 🔴 **Mop up.** When it finishes, go to your profile "Replies" tab, press **Scan** again, then **Start**. Repeat until Scan finds 0. Anything in "failed" can be retried with **Retry failed** then **Start**.
+8. **It keeps going by itself.** With "Keep going on its own" ticked (the default) it reloads your profile after each pass, scans for older posts X was hiding, deletes those, and repeats until two scans in a row find nothing. The log then says FINISHED. The tab must stay open and on your profile page the whole time. Untick that box if you'd rather run one pass at a time; then press **Scan** and **Start** yourself until Scan finds 0. Anything in "failed" can be retried with **Retry failed** then **Start**.
 
 ## What good looks like
 
@@ -30,7 +30,7 @@ Deletes every post, reply and repost on your own X account. It is a small Chrome
 - **Progress is saved.** Close the popup, reload the tab, even restart the browser; press Start again and it carries on where it left off.
 - **"Also remove reposts"** is ticked by default. Untick it before loading or scanning if you want reposts kept.
 - **Why not the official X API?** The free tier allows only a handful of deletes per day. This tool uses the same internal calls the X website itself makes when you click Delete, so it is fast. If X changes those internals the tool may stop working until it is updated.
-- **Scan only sees what X shows.** X shows roughly the newest 3,200 posts on a profile. As posts are deleted, older ones appear, which is why step 8 repeats. The archive route gets everything in one go.
+- **Scan only sees what X shows.** X shows roughly the newest 3,200 posts on a profile. As posts are deleted, older ones appear, which is why auto mode reloads and re-scans. The archive route gets everything in one go.
 - **Likes, bookmarks and DMs** are not touched.
 
 ## Files

@@ -52,9 +52,10 @@ function render(status) {
 
 async function loadOpts() {
   const d = await chrome.storage.local.get(['opts', 'status']);
-  const opts = { delayMs: 900, dryRun: true, includeReposts: true, ...(d.opts || {}) };
+  const opts = { delayMs: 900, dryRun: true, includeReposts: true, auto: true, ...(d.opts || {}) };
   $('dryRun').checked = opts.dryRun;
   $('includeReposts').checked = opts.includeReposts;
+  $('auto').checked = opts.auto;
   $('delay').value = opts.delayMs;
   updateArmRow();
   render(d.status);
@@ -66,6 +67,7 @@ async function saveOpts() {
     ...(d.opts || {}),
     dryRun: $('dryRun').checked,
     includeReposts: $('includeReposts').checked,
+    auto: $('auto').checked,
     delayMs: Math.max(300, Number($('delay').value) || 900),
   };
   await chrome.storage.local.set({ opts });
@@ -158,6 +160,7 @@ $('reset').addEventListener('click', async () => {
 
 $('dryRun').addEventListener('change', () => { updateArmRow(); saveOpts(); });
 $('includeReposts').addEventListener('change', saveOpts);
+$('auto').addEventListener('change', saveOpts);
 $('delay').addEventListener('change', saveOpts);
 $('arm').addEventListener('input', () => {
   armed = $('arm').value.trim() === 'DELETE';

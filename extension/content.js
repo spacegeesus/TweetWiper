@@ -12,7 +12,7 @@
     queue: [],            // [{ id, kind: 'tweet' | 'repost' }]
     done: new Set(),      // ids confirmed gone
     failed: {},           // id -> reason
-    opts: { delayMs: 900, dryRun: true, includeReposts: true },
+    opts: { delayMs: 900, dryRun: true, includeReposts: true, auto: true },
     running: false,
     stop: false,
     qids: { ...FALLBACK_QIDS },
@@ -168,6 +168,7 @@
     if (S.running) return;
     S.running = true;
     S.stop = false;
+    let fatal = false;
     publish(true);
     try {
       const pending = pendingItems();
@@ -195,7 +196,7 @@
         } else {
           S.failed[item.id] = res.err;
           log('failed ' + item.kind + ' ' + item.id + ': ' + res.err);
-          if (res.fatal) { log('Stopping: fix the problem above, then press Start to resume.'); break; }
+          if (res.fatal) { fatal = true; log('Stopping: fix the problem above, then press Start to resume.'); break; }
         }
         n++;
         if (n % 20 === 0) {
@@ -209,10 +210,84 @@
       await saveState();
       const gone = S.queue.filter((q) => S.done.has(q.id)).length;
       log('Done this pass. ' + gone + ' gone, ' + Object.keys(S.failed).length + ' failed, ' + pendingItems().length + ' not yet tried.');
+      if (S.opts.auto && !S.stop && !fatal && isProfilePage()) {
+        await scheduleAutoReload('pass finished');
+      }
     } finally {
       S.running = false;
       publish(true);
     }
+  }
+
+  // ---- Auto mode: reload the profile, re-scan, delete, repeat until two
+  // scans in a row find nothing new. State lives in storage so it survives
+  // the reload (which kills this script and starts a fresh copy).
+  const AUTO_KEY = 'autoResume';
+  const AUTO_MAX_CYCLES = 60;
+
+  function isProfilePage() {
+    const m = location.pathname.match(/^\/([A-Za-z0-9_]{1,15})(?:\/with_replies)?\/?$/);
+    const notProfiles = ['home', 'explore', 'notifications', 'messages', 'i', 'settings', 'search', 'compose'];
+    return !!m && !notProfiles.includes(m[1].toLowerCase());
+  }
+
+  async function scheduleAutoReload(reason) {
+    const d = await chrome.storage.local.get(AUTO_KEY);
+    const prev = d[AUTO_KEY] || { cycle: 0, zeroStreak: 0 };
+    if (prev.cycle >= AUTO_MAX_CYCLES) {
+      log('Auto mode stopped after ' + AUTO_MAX_CYCLES + ' rounds. Press Start to continue.');
+      await chrome.storage.local.remove(AUTO_KEY);
+      return;
+    }
+    const next = { cycle: prev.cycle + 1, zeroStreak: prev.zeroStreak, url: location.href, at: Date.now() };
+    await chrome.storage.local.set({ [AUTO_KEY]: next });
+    log('Auto mode (' + reason + '): reloading the page to find older posts, round ' + next.cycle + '. Keep the tab open.');
+    await sleep(1200);
+    location.reload();
+  }
+
+  async function waitForTimeline(maxMs) {
+    const end = Date.now() + maxMs;
+    while (Date.now() < end) {
+      if (document.querySelector('article[data-testid="tweet"]')) return true;
+      if (document.querySelector('[data-testid="emptyState"]')) return false;
+      await sleep(500);
+    }
+    return false;
+  }
+
+  async function autoResume() {
+    const d = await chrome.storage.local.get(AUTO_KEY);
+    const a = d[AUTO_KEY];
+    if (!a) return;
+    if (Date.now() - a.at > 10 * 60 * 1000 || !isProfilePage() || !ct0()) {
+      await chrome.storage.local.remove(AUTO_KEY);
+      log('Auto mode stopped: ' + (!ct0() ? 'not signed in.' : !isProfilePage() ? 'this is not your profile page.' : 'too much time passed.') + ' Press Start on your profile page to continue.');
+      return;
+    }
+    await loadState();
+    if (S.opts.dryRun || !S.opts.auto) { await chrome.storage.local.remove(AUTO_KEY); return; }
+    log('Auto mode round ' + a.cycle + ': waiting for the page to load...');
+    await waitForTimeline(20000);
+    await sleep(2500);
+    const before = pendingItems().length;
+    try { await scanProfile(); } catch (e) { log(e.message); await chrome.storage.local.remove(AUTO_KEY); return; }
+    const added = pendingItems().length - before;
+    if (added === 0) {
+      a.zeroStreak = (a.zeroStreak || 0) + 1;
+      await chrome.storage.local.set({ [AUTO_KEY]: a });
+      if (a.zeroStreak >= 2) {
+        await chrome.storage.local.remove(AUTO_KEY);
+        log('Two scans in a row found nothing left to delete. FINISHED. Reload your profile to admire the empty page.');
+        return;
+      }
+      log('Scan found nothing new; checking once more to be sure.');
+      await scheduleAutoReload('double-check');
+      return;
+    }
+    a.zeroStreak = 0;
+    await chrome.storage.local.set({ [AUTO_KEY]: a });
+    run();
   }
 
   // Scroll the profile page that is open in this tab and collect every post id
@@ -276,11 +351,22 @@
           return { ok: true, running: S.running, signedIn: !!ct0(), path: location.pathname };
         case 'start':
           if (S.running) return { ok: false, err: 'already running' };
+          await chrome.storage.local.remove(AUTO_KEY);
+          if (S.opts.auto && !S.opts.dryRun && pendingItems().length === 0 && isProfilePage()) {
+            // Nothing queued yet: in auto mode, scan first, then delete.
+            (async () => {
+              try { await scanProfile(); } catch (e) { log(e.message); return; }
+              if (pendingItems().length) run();
+              else log('Nothing to delete on this page.');
+            })();
+            return { ok: true };
+          }
           run();
           return { ok: true };
         case 'stop':
           S.stop = true;
-          log('Stop requested, finishing the current item.');
+          await chrome.storage.local.remove(AUTO_KEY);
+          log('Stop requested, finishing the current item. Auto mode off until you press Start.');
           return { ok: true };
         case 'scan':
           if (S.running) return { ok: false, err: 'already running' };
@@ -303,5 +389,5 @@
     return true;
   });
 
-  loadState().then(() => publish(true));
+  loadState().then(() => { publish(true); autoResume(); });
 })();
