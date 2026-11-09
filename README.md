@@ -2,7 +2,7 @@
 
 Deletes every post, reply and repost on your own X account. It is a small Chrome/Edge extension that works inside the X tab you are already signed into, so signing in with Google is fine. It never sees your password, sends nothing anywhere except to x.com, and is free (MIT license).
 
-**Get it:** [download TweetWiper-extension.zip](https://github.com/bryanpepperjr-web/TweetWiper/releases/latest/download/TweetWiper-extension.zip) and unzip it, or clone this repo. Then follow the steps below. The archive step is optional; the Scan button alone gets everything, it just takes a few rounds.
+**Get it:** [download TweetWiper-extension.zip](https://github.com/spacegeesus/TweetWiper/releases/latest/download/TweetWiper-extension.zip) and unzip it, or clone this repo. Then follow the steps below. The archive step is optional; the Scan button alone gets everything, it just takes a few rounds.
 
 ## Your move
 
